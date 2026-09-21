@@ -1,0 +1,5 @@
+dist/
+rosevim-server
+rosevim-server-go
+rosevim-server-go.exe
+node_modules/

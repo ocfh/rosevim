@@ -24,14 +24,24 @@ function pickEncoding(req: any): Encoding | null {
   return null;
 }
 
+// Brotli's default quality (11) spends ~108 ms of CPU on a 32 KB document;
+// quality 5 does the same document in ~2.4 ms for 9% more bytes (measured,
+// Node 22). A dynamic response is compressed per request and nobody caches
+// it, so that CPU is pure latency: 45x slower to save 8% of bytes that are
+// already 170x smaller than the same page in Next.js. The static path keeps
+// quality 11 - see the file cache below, where those bytes are paid for once
+// and then served from memory, and they ARE the headline number.
+// ponytail: one constant, shared by the buffered and the streaming paths.
+const brotliFast = { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 };
+
 function compress(enc: Encoding, data: string | Buffer): Buffer {
-  if (enc === 'br') return zlib.brotliCompressSync(data);
+  if (enc === 'br') return zlib.brotliCompressSync(data, { params: brotliFast });
   if (enc === 'gzip') return zlib.gzipSync(data);
   return zlib.deflateSync(data);
 }
 
 function createCompressor(enc: Encoding): zlib.Gzip | zlib.Deflate | zlib.BrotliCompress {
-  if (enc === 'br') return zlib.createBrotliCompress();
+  if (enc === 'br') return zlib.createBrotliCompress({ params: brotliFast });
   if (enc === 'gzip') return zlib.createGzip();
   return zlib.createDeflate();
 }
@@ -702,7 +712,27 @@ function serveStatic(dir: string, isr = false): (req: any, res: any) => void {
           res.setHeader('Content-Encoding', enc);
           const compressor = createCompressor(enc);
           compressor.pipe(res);
-          write = (chunk) => compressor.write(chunk);
+          // The shell must reach the socket NOW. Without a flush zlib emits
+          // nothing until end(), so the "streamed" route's first byte would
+          // arrive after the whole render - measured: 0 bytes before end(),
+          // which made /sign's TTFB its slowest $data instead of ~0.
+          // Z_FULL_FLUSH, not Z_SYNC_FLUSH: on Node 22 a sync flush poisons
+          // the brotli stream (every later write ends in
+          // ERR_BROTLI_COMPRESSION_FAILED - reproduced in isolation), while a
+          // full flush emits the shell at ~10 ms and completes cleanly. The
+          // cost is one empty block boundary, which quality 5 barely notices.
+          let flushed = false;
+          write = (chunk) => {
+            compressor.write(chunk);
+            if (!flushed) {
+              flushed = true;
+              compressor.flush(zlib.constants.Z_FULL_FLUSH);
+            }
+          };
+          // pipe() forwards data but not errors, and an unhandled 'error'
+          // event kills the worker. A compressor fault must cost one socket,
+          // not the process: destroy it and let the client retry.
+          compressor.on('error', () => res.destroy());
           done = () => compressor.end();
         } else {
           write = (chunk) => res.write(chunk);

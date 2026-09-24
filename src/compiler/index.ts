@@ -481,7 +481,19 @@ if (!__had_${d.name}) set${capitalize(d.name)}(await $data(${fn}));`;
   // Actions ship in the SSR module only; the client bundle gets every other
   // export (params, sync helpers) but never an action body.
   const ssrExports = actions.length > 0 ? `${exportStmts}\n${actions.map((a) => a.stmt).join('\n')}` : exportStmts;
-  const ssr = generateSSR(cleanScript, compiledTemplate, stateDeclsCode, ssrExports, compiledHead);
+  // pages/_middleware.rose is a hook module, not a route: no template, no
+  // state, no head. Its script therefore belongs at MODULE scope, because
+  // `handle` is hoisted there and the things a middleware actually needs -
+  // a database connection, a cache, a client - are declared beside it.
+  // Inside render() those declarations would be unreachable: the server
+  // entry imports middlewareMod.handle and never calls render(). (This is
+  // exactly how a first DB-backed page was written: the page's $data body
+  // ships to the browser, so the query lives in the middleware, which the
+  // compiler keeps server-side.)
+  const isMiddleware = path.basename(filePath) === '_middleware.rose';
+  const ssr = isMiddleware
+    ? `${RUNTIME_IMPORTS}\n\n${ssrExports}\n\n${cleanScript}\n`
+    : generateSSR(cleanScript, compiledTemplate, stateDeclsCode, ssrExports, compiledHead);
   const client = generateClient(cleanScript, compiledTemplate, stateDeclsCode, eventBindings, exportStmts, compiledHead);
 
   return { ssr, client, stateKeys, actionNames: [...actionNames], style: scopedStyle, hasParams, usesContext, revalidate, csr, prefetch, bundle, needsClient, clientReasons, jsWarnings, headers };
@@ -936,6 +948,11 @@ function compileSlot(acc: string): string {
   return `${acc} += String(children);\n`;
 }
 
+// The runtime's public surface, as one import line. Three generators emit it
+// (page SSR, page client, the middleware module) - one constant so the list
+// can never drift between them.
+const RUNTIME_IMPORTS = `import { state, $data, hasState, esc, refresh, onMount, onCleanup, getContext, $t, bestLocale, $cookies, $sessionCookie, $store } from './runtime.js';`;
+
 function generateSSR(script: string, templateFn: string, stateDeclsCode: string, exports = '', headFn = ''): string {
   // The head block renders to a clean html string (no markers) and is wrapped
   // in an h marker pair: renderPage extracts it for <head> injection, the
@@ -948,7 +965,7 @@ closes.push(__head);
 __html += "<!--\u27e6h:" + __hi + "\u27e7-->" + __head() + "<!--\u27e6/h:" + __hi + "\u27e7-->";`
     : '';
   return `
-import { state, $data, hasState, esc, refresh, onMount, onCleanup, getContext, $t, bestLocale, $cookies, $sessionCookie, $store } from './runtime.js';
+${RUNTIME_IMPORTS}
 
 ${exports}
 
@@ -984,7 +1001,7 @@ __html += "<!--\u27e6h:" + __hi + "\u27e7-->" + __head() + "<!--\u27e6/h:" + __h
     : '';
 
   return `
-import { state, $data, hasState, esc, refresh, onMount, onCleanup, getContext, $t, bestLocale, $cookies, $sessionCookie, $store } from './runtime.js';
+${RUNTIME_IMPORTS}
 
 ${exports}
 

@@ -31,7 +31,36 @@
     if (pathname === '/about' && best) {
       return new Response(null, { status: 302, headers: { location: '/' + best + '/about', vary: 'Accept-Language' } });
     }
+    // Server-side data loading for the dynamic half: /feed's rows are read
+    // HERE, in the one module the compiler never ships to the browser. A
+    // page's $data body DOES ship (it re-runs on client-side navigation),
+    // so a database import inside a page would land in the client bundle
+    // and break the build - the middleware is where server-only data
+    // loading lives. Gated by pathname: the query runs for the route that
+    // needs it, not on every request in the app. node:sqlite is imported
+    // lazily for the same reason as in the api routes: the edge adapter
+    // loads this bundle too, and a static node: import would boot-crash
+    // the whole app there instead of failing this one route.
+    if (pathname === '/feed') {
+      feedConn ??= await openFeed();
+      getContext().posts = feedConn.prepare('SELECT id, title, author FROM posts ORDER BY id DESC LIMIT 20').all();
+    }
     // the rest of the request sees who is asking
     getContext().user = session ? { name: session } : null;
   }
+
+  // The feed's connection, opened once per process (the same lazy pattern
+  // as the api routes): this module lives for the server's whole life.
+  let feedConn = null;
+  const openFeed = async () => {
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync('blog.db');
+    db.exec(`CREATE TABLE IF NOT EXISTS posts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      author TEXT NOT NULL DEFAULT 'anonymous'
+    );`);
+    return db;
+  };
 </script>

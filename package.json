@@ -10,13 +10,6 @@
     "serve": "tsx src/cli/index.ts serve example",
     "pack": "node pack.mjs",
     "prepublishOnly": "npm run pack",
-    "benchmark": "tsx benchmark.ts",
-    "test": "tsx src/cli/index.ts build example && tsx test-client.ts",
-    "test:cli": "node test-cli.mjs",
-    "test:e2e": "tsx test-e2e.ts",
-    "test:edge": "tsx test-edge.ts",
-    "test:go": "tsx src/cli/index.ts build example && node test-go.mjs",
-    "test:pack": "node test-pack.mjs",
     "build:go": "go build -o rosefn-server ."
   },
   "bin": {

@@ -1,10 +1,10 @@
 /**
- * rosevim Edge adapter - Web-standard fetch handler.
+ * rosefn Edge adapter - Web-standard fetch handler.
  *
  * Works on any edge runtime that supports the Fetch API standard
  * (Cloudflare Workers, Deno Deploy, Vercel Edge, Bun, Node 18+):
  *
- *   import { createEdgeHandler } from 'rosevim/edge';
+ *   import { createEdgeHandler } from 'rosefn/edge';
  *   const handle = createEdgeHandler('./dist');
  *   export default { fetch: handle };
  *
@@ -41,7 +41,7 @@ type ServerModule = {
 };
 
 /**
- * Create a fetch handler from a built rosevim project.
+ * Create a fetch handler from a built rosefn project.
  * @param outDir directory containing server.js and client.js
  */
 export async function createEdgeHandler(outDir: string): Promise<(request: Request) => Promise<Response>> {

@@ -1,5 +1,5 @@
 /**
- * rosevim Runtime - Zero-hydration, compile-time reactivity
+ * rosefn Runtime - Zero-hydration, compile-time reactivity
  * Target: < 2KB gzipped
  */
 
@@ -13,8 +13,8 @@ let currentEffect: (() => void) | null = null;
 
 // ponytail: global signal map, shared across all inlined modules
 let signalMap: Map<string, SignalEntry> =
-  (globalThis as any).__rosevim_signalMap ?? new Map();
-(globalThis as any).__rosevim_signalMap = signalMap;
+  (globalThis as any).__rosefn_signalMap ?? new Map();
+(globalThis as any).__rosefn_signalMap = signalMap;
 
 // One get-or-create helper shared by state / setState / resumeState.
 function entry(key: string, initial: unknown): { value: unknown; subs: Set<Subscriber> } {
@@ -106,12 +106,12 @@ export function tpl(html: string): DocumentFragment {
 
 // === Document head (<head> blocks) ===
 
-// Marks the head elements rosevim manages, so stale ones can be removed when a
+// Marks the head elements rosefn manages, so stale ones can be removed when a
 // route's head changes and user-authored <head> content is never touched.
 // The SSR shell marks the elements it injects with the same attribute + key,
 // so the runtime adopts them in place instead of creating duplicates on the
 // first client-side navigation.
-const HEAD_ATTR = 'data-rosevim-head';
+const HEAD_ATTR = 'data-rosefn-head';
 
 /**
  * Apply one rendered <head> block to the document: <title> replaces the title,
@@ -160,7 +160,7 @@ export function applyHead(html: string, provided: Set<string>): void {
   });
 }
 
-/** Drop every rosevim-managed head element (routes without <head> blocks). */
+/** Drop every rosefn-managed head element (routes without <head> blocks). */
 export function clearHead(): void {
   document.head.querySelectorAll(`[${HEAD_ATTR}]`).forEach((el) => el.remove());
 }
@@ -569,7 +569,7 @@ export function $t(key: string, vars?: Record<string, string>): string {
 // machine, and the transport seam is where a redis bus would plug in).
 //
 // ponytail: one driver (memory + cluster IPC) covers every single-machine
-// deploy, which is exactly what `rosevim serve` gives you. A cross-machine
+// deploy, which is exactly what `rosefn serve` gives you. A cross-machine
 // driver is the documented next step - it needs a client library, and
 // setStoreTransport() below is the seam it plugs into.
 

@@ -1,5 +1,5 @@
 /**
- * rosevim Compiler - Compile .rose components to SSR + client-resume JS
+ * rosefn Compiler - Compile .rose components to SSR + client-resume JS
  *
  * Features: compile-time reactivity, zero-hydration resume, file-system
  * routing, nested layouts, server data fetching ($data) with request cache.
@@ -198,7 +198,7 @@ export interface Plugin {
 }
 
 /**
- * Plugins live in `<root>/rosevim.config.js` as the default export: an array
+ * Plugins live in `<root>/rosefn.config.js` as the default export: an array
  * of `{ name, transform }`, run over each component's raw source (template +
  * script + style, before any parsing). ponytail: ONE hook - it covers macros,
  * custom syntax, includes and auto-imports; add bundler/build hooks when a
@@ -208,7 +208,7 @@ export interface Plugin {
  * error still fails loudly).
  */
 export async function loadPlugins(root: string): Promise<Plugin[]> {
-  const file = path.join(root, 'rosevim.config.js');
+  const file = path.join(root, 'rosefn.config.js');
   if (!fs.existsSync(file)) return [];
   const mod = await import(pathToFileURL(file).href + `?t=${Date.now()}`);
   return (mod.default as Plugin[] | undefined) ?? [];
@@ -507,7 +507,7 @@ if (!__had_${d.name}) set${capitalize(d.name)}(await $data(${fn}));`;
  * Global element rules (:root/html/body) belong in the shell's STYLES.
  */
 function scopeCss(css: string, key: string): string {
-  const attr = `[data-rosevim-c="${key}"]`;
+  const attr = `[data-rosefn-c="${key}"]`;
   const clean = css.replace(/\/\*[\s\S]*?\*\//g, '');
   let out = '';
   let prelude = '';
@@ -549,7 +549,7 @@ function scopeCss(css: string, key: string): string {
  * top-level {#if}/{#each} block are top-level at render time and get it too.
  */
 function injectScopeAttr(template: string, key: string): string {
-  const attr = ` data-rosevim-c="${key}"`;
+  const attr = ` data-rosefn-c="${key}"`;
   let out = '';
   let depth = 0;
   let i = 0;
@@ -1005,7 +1005,7 @@ ${RUNTIME_IMPORTS}
 
 ${exports}
 
-const __handlers = globalThis.__rosevim_handlers ?? (globalThis.__rosevim_handlers = {});
+const __handlers = globalThis.__rosefn_handlers ?? (globalThis.__rosefn_handlers = {});
 
 export async function render(closes, children) {
   ${stateDeclsCode}
@@ -1078,10 +1078,10 @@ export async function buildProject(root: string, outDir: string): Promise<{ rout
   // failure mode (an empty dist/ deploys as a blank site). Say it plainly:
   // this is not a project root, or the pages live somewhere else.
   if (files.length === 0) {
-    throw new Error(`no .rose pages found under ${path.join(root, 'src', 'pages')} - run rosevim from a project root, or pass one: rosevim build <dir>`);
+    throw new Error(`no .rose pages found under ${path.join(root, 'src', 'pages')} - run rosefn from a project root, or pass one: rosefn build <dir>`);
   }
   const infos = files.map((f) => ({ ...getRouteInfo(f, root) }));
-  // Plugins (innovation #30): rosevim.config.js at the project root, loaded
+  // Plugins (innovation #30): rosefn.config.js at the project root, loaded
   // fresh per build so the dev server's hot rebuild picks up config edits.
   const plugins = await loadPlugins(root);
   // scope key: the component's path under pages/ (index, _layout, blog/[id])
@@ -1127,8 +1127,14 @@ export async function buildProject(root: string, outDir: string): Promise<{ rout
   // Shared runtime module, bundled once into client and server output.
   // The runtime ships WITH THE COMPILER, not with the app: resolve it from
   // this file's own location so any project root builds (the in-repo
-  // example used to be the only layout that worked).
-  const runtimeEntry = fileURLToPath(new URL('../runtime/index.ts', import.meta.url));
+  // example used to be the only layout that worked). Two layouts answer: in
+  // the repo this module sits at src/compiler/, in the published package the
+  // compiler is bundled to dist-cli/compiler/index.mjs with the sources
+  // beside it - so the source is either a sibling or two levels down.
+  const runtimeEntry = ['../runtime/index.ts', '../src/runtime/index.ts']
+    .map((rel) => fileURLToPath(new URL(rel, import.meta.url)))
+    .find((p) => fs.existsSync(p));
+  if (!runtimeEntry) throw new Error('Rosefn: the runtime source (src/runtime/index.ts) was not found next to the compiler');
   await esbuild.build({
     entryPoints: [runtimeEntry],
     bundle: true,
@@ -1274,16 +1280,16 @@ import { setState, clearRequestState, serializeState, resetRequestContext, isLoc
 // must name one of these dictionaries, and $t resolves keys against it.
 setLocales(${localesJson}, '${defaultLocale}');
 
-// Phase 2: the store transport. Under "rosevim serve" every worker is its
+// Phase 2: the store transport. Under "rosefn serve" every worker is its
 // own process with its own dist/server.js module, so a $store write must
 // travel: this worker -> primary -> every other worker. process.send exists
 // only inside cluster workers, so a single-process runner (dev, preview,
 // the edge adapter) keeps the transport null and $store stays plain
 // per-process state - the documented boundary, not a bug.
 if (typeof process !== 'undefined' && typeof process.send === 'function') {
-  setStoreTransport((name, value) => process.send({ type: 'rosevim:store', name, value }));
+  setStoreTransport((name, value) => process.send({ type: 'rosefn:store', name, value }));
   process.on('message', (msg) => {
-    if (msg && msg.type === 'rosevim:store') applyStorePatch(msg.name, msg.value);
+    if (msg && msg.type === 'rosefn:store') applyStorePatch(msg.name, msg.value);
   });
 }
 
@@ -1499,7 +1505,7 @@ export async function renderPage(pathname, form) {
       try {
         rendered = extractHead(await route.render([], ''));
       } catch (err) {
-        console.error('Rosevim: render failed for', pathname, err instanceof Error ? err.message : err);
+        console.error('Rosefn: render failed for', pathname, err instanceof Error ? err.message : err);
         if (errorPage) return { ...(await renderFallback(pathname, errorPage)), status: 500 };
         return { html: '<h1>500</h1><p>Something went wrong rendering this page.</p>', state: '{}', head: [], status: 500 };
       }
@@ -1608,7 +1614,7 @@ export async function renderPageStream(pathname, write, shellOpen, clientTag) {
         // the shell is already on the wire: degrade to the error page BODY
         // (the status stays 200 - a real 500 needs the buffered path, which
         // the server picks for routes known-broken at build time)
-        console.error('Rosevim: render failed for', pathname, err instanceof Error ? err.message : err);
+        console.error('Rosefn: render failed for', pathname, err instanceof Error ? err.message : err);
         html = errorPage ? extractHead(await errorPage([], '')).html : '<h1>500</h1><p>Something went wrong rendering this page.</p>';
       }
       write(html);
@@ -1621,7 +1627,7 @@ export async function renderPageStream(pathname, write, shellOpen, clientTag) {
         return 200;
       }
       const state = JSON.stringify({ __route: pathname, ...JSON.parse(serializeState()) });
-      write('</div>\\n  <script type="application/json" id="__rosevim_state">' + state + '</script>\\n  ' + clientTag + '\\n</body>\\n</html>');
+      write('</div>\\n  <script type="application/json" id="__rosefn_state">' + state + '</script>\\n  ' + clientTag + '\\n</body>\\n</html>');
       return 200;
     }
   }
@@ -1737,7 +1743,7 @@ export function matchRoute(pattern, pathname) {
 // Hover / focus / touch an internal link and the target route renders NOW -
 // $data included - against a throwaway signal map. The click that follows
 // paints from the cached HTML: no await, no request, no spinner. SvelteKit
-// and Qwik prefetch data only; Rosevim prefetches the whole render because
+// and Qwik prefetch data only; Rosefn prefetches the whole render because
 // the inlined bundle already contains every route.
 // ponytail: the cache holds either a result or the in-flight promise (dedupes
 // hover storms); one isolated render runs at a time so signal-map swapping
@@ -1825,15 +1831,15 @@ export function prefetchStats() {
 // $action instead of the local handler registry.
 const DELEGATED = ['click', 'input', 'change', 'submit'];
 function bindEvents(container) {
-  if (container.__rosevim_bound) return;
-  container.__rosevim_bound = true;
+  if (container.__rosefn_bound) return;
+  container.__rosefn_bound = true;
   for (const ev of DELEGATED) {
     container.addEventListener(ev, (e) => {
       const el = e.target.closest('[data-on-' + ev + ']');
       if (!el || !container.contains(el)) return;
       const fn = el.getAttribute('data-on-' + ev);
       if (fn.startsWith('$action:')) return $action(fn.slice(8), e);
-      const h = globalThis.__rosevim_handlers[fn];
+      const h = globalThis.__rosefn_handlers[fn];
       if (h) h(e);
     });
   }
@@ -1850,7 +1856,7 @@ async function postForm(body) {
   const html = await res.text();
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const next = doc.getElementById('app');
-  const st = doc.getElementById('__rosevim_state');
+  const st = doc.getElementById('__rosefn_state');
   const paint = () => {
     const container = document.getElementById('app');
     adopt(container, next ? next.innerHTML : '', st ? st.textContent : '{}');
@@ -1877,7 +1883,7 @@ export { postForm };
 export async function start(container, pathname, initial) {
   clearMounts(); // stale mounts from a failed render never fire
   if (initial) {
-    const el = document.getElementById('__rosevim_state');
+    const el = document.getElementById('__rosefn_state');
     if (el) resumeState(el.textContent);
   }
   for (const route of routes) {
@@ -1947,7 +1953,7 @@ export async function adopt(container, html, stateJson) {
   resumeState(stateJson);
   container.innerHTML = html;
   // keep the embedded state in sync so a later SPA-fallback check agrees
-  const st = document.getElementById('__rosevim_state');
+  const st = document.getElementById('__rosefn_state');
   if (st) st.textContent = stateJson;
   for (const route of routes) {
     if (matchRoute(route.pattern, location.pathname)) {
@@ -2036,13 +2042,13 @@ setRefreshHook(async () => {
   // route-level on purpose: a danger pattern only matters when the document
   // actually ships JS-free (under an interactive route the bundle is there
   // and the handler works).
-  console.log('Rosevim zero-JS report:');
+  console.log('Rosefn zero-JS report:');
   for (const line of buildReport(infos, compiled)) console.log('  ' + line);
   for (const { info, i } of pages) {
     if (!routeShipsNoJs(infos, compiled, i)) continue;
     for (const ci of [i, ...layoutsOf(infos, i)]) {
       for (const w of compiled[ci].jsWarnings ?? []) {
-        console.warn(`Rosevim warning: ${info.routePath} ships zero JavaScript but ${path.basename(infos[ci].filePath)} contains ${w}`);
+        console.warn(`Rosefn warning: ${info.routePath} ships zero JavaScript but ${path.basename(infos[ci].filePath)} contains ${w}`);
       }
     }
   }

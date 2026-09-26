@@ -1,5 +1,5 @@
 /**
- * HTML shell - the document wrapper for every rosevim page.
+ * HTML shell - the document wrapper for every rosefn page.
  *
  * The client bundle is INLINED into the document, so a full page load costs
  * exactly one request: the HTML itself. No other framework in the comparison
@@ -86,7 +86,7 @@ document.addEventListener('click', (e) => {
 });
 // Prefetch the target route's full render (including $data) on hover, keyboard
 // focus, or touch - the click that follows paints from cache: no await, no
-// request. SvelteKit/Qwik prefetch data only; Rosevim prefetches the render
+// request. SvelteKit/Qwik prefetch data only; Rosefn prefetches the render
 // because the inlined bundle already contains every route.
 function __prefetchHandler(e) {
   const a = e.target.closest && e.target.closest('a[href^="/"]');
@@ -132,7 +132,7 @@ document.addEventListener('submit', (e) => {
 // If the document was rendered for a DIFFERENT route (a static-file server's
 // SPA fallback serves index.html for unknown paths), adopt nothing - let the
 // client router render the requested route from scratch.
-const __st = document.getElementById('__rosevim_state');
+const __st = document.getElementById('__rosefn_state');
 const __state = __st ? JSON.parse(__st.textContent || '{}') : {};
 if (__state.__route === window.location.pathname) {
   start(__app, window.location.pathname, true);
@@ -141,7 +141,7 @@ if (__state.__route === window.location.pathname) {
 }
 `, { minify: true }).code;
 
-// The document inlines its entire runtime, so rosevim can ship a STRICT
+// The document inlines its entire runtime, so rosefn can ship a STRICT
 // content security policy without 'unsafe-inline' in script-src - the one
 // thing every compared framework cannot do by default (their separate,
 // often dynamically-named bundles force 'unsafe-inline' or nonce plumbing).
@@ -151,7 +151,7 @@ if (__state.__route === window.location.pathname) {
 // component styles are inline <style> blocks: CSS cannot execute, and
 // hashing every route-dependent style block would cost more than it buys.
 // img/font stay data: (assets are inlined), connect/form stay 'self'
-// (a rosevim app is one origin), and object/base/frame are locked down.
+// (a rosefn app is one origin), and object/base/frame are locked down.
 // A route exporting `headers = { ... }` overrides any of this per route.
 // Mode B (P0 §1) and the edge's no-build case share the external shape:
 // /client.js plus a tiny inline bootstrap. There the hash covers exactly
@@ -230,7 +230,7 @@ function mergeHeadBlocks(blocks: string[]): string {
       // keyed tags carry their key (must match HEAD_ATTR in the runtime) so
       // the client adopts these SSR-injected elements in place on the first
       // navigation instead of creating duplicates
-      const marked = keyMatch ? m[0].replace(/^<\w+/, (t) => `${t} data-rosevim-head="${key}"`) : m[0];
+      const marked = keyMatch ? m[0].replace(/^<\w+/, (t) => `${t} data-rosefn-head="${key}"`) : m[0];
       put(key, marked);
     }
   }
@@ -256,7 +256,7 @@ export function shellOpen(styles: string = getStyles()): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rosevim</title>
+  <title>Rosefn</title>
   <style>${STYLES}</style>${styleTag}
   ${FAVICON}
 </head>
@@ -270,7 +270,7 @@ export function buildShell(ssrHtml: string, stateJson: string, client: string | 
 
   const mergedHead = mergeHeadBlocks(head);
   // a route-provided <title> replaces the default one
-  const titleTag = /<title>/i.test(mergedHead) ? '' : '<title>Rosevim</title>';
+  const titleTag = /<title>/i.test(mergedHead) ? '' : '<title>Rosefn</title>';
   // a route-provided icon replaces the inline favicon
   const iconTag = /rel=["']?icon/i.test(mergedHead) ? '' : `\n  ${FAVICON}`;
   const headTags = mergedHead ? `\n  ${mergedHead}` : '';
@@ -281,7 +281,7 @@ export function buildShell(ssrHtml: string, stateJson: string, client: string | 
   // client-side navigation and the SPA fallback; only this document is
   // JS-free. Scoped styles stay: CSS is not JavaScript.
   const jsTail = js
-    ? `\n  <script type="application/json" id="__rosevim_state">${stateJson}</script>\n  ${clientTag}`
+    ? `\n  <script type="application/json" id="__rosefn_state">${stateJson}</script>\n  ${clientTag}`
     : '';
 
   return `<!DOCTYPE html>

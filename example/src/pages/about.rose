@@ -4,7 +4,7 @@
   // alike - the observable proof that a render really re-fetched
   export const stats = { fetches: 0 };
 
-  let title = $state('About Rosevim');
+  let title = $state('About Rosefn');
   let facts = $data(async () => {
     stats.fetches += 1;
     return [
@@ -18,7 +18,7 @@
   // refresh() re-runs this route's render in place: $data re-fetches, the
   // fresh render's state re-seeds, and wire() patches only what changed -
   // zero requests, no navigation. (Next.js router.refresh() round-trips the
-  // server; rosevim renders in the page because the bundle already has the
+  // server; rosefn renders in the page because the bundle already has the
   // route - and a real app's $data can hit its API from either side.)
   async function reload() {
     await refresh();
@@ -40,8 +40,8 @@
 </script>
 
 <head>
-  <title>{title()} - Rosevim</title>
-  <meta name="description" content="What Rosevim is and the ideas it is built on.">
+  <title>{title()} - Rosefn</title>
+  <meta name="description" content="What Rosefn is and the ideas it is built on.">
 </head>
 
 <style>
@@ -51,10 +51,10 @@
 </style>
 
 <div>
-  <img src="/logo.svg" alt="Rosevim" width="72" height="72">
+  <img src="/logo.svg" alt="Rosefn" width="72" height="72">
   <h1>{title()}</h1>
   <div class="rcard">
-    <p>Rosevim is a revolutionary web framework designed to be the fastest, simplest, and most performant framework ever created.</p>
+    <p>Rosefn is a revolutionary web framework designed to be the fastest, simplest, and most performant framework ever created.</p>
     <p>data fetches: {stats.fetches}</p>
     <button on:click={reload}>Refresh data</button>
   </div>

@@ -1,4 +1,4 @@
-// Rosevim plugins (innovation #30): the default export is an array of
+// Rosefn plugins (innovation #30): the default export is an array of
 // { name, transform }, and every transform sees a component's RAW source
 // (template + script + style, before any parsing) and returns what the
 // compiler will parse. ponytail: one hook covers macros, custom syntax,

@@ -13,12 +13,12 @@
   // {name} interpolation (the template parser has no nested braces, so the
   // call lives in a function: the marker closure runs it per repaint)
   function greeting() {
-    return $t('about.greeting', { name: 'Rosevim' });
+    return $t('about.greeting', { name: 'Rosefn' });
   }
 </script>
 
 <head>
-  <title>{$t('about.title')} - Rosevim</title>
+  <title>{$t('about.title')} - Rosefn</title>
   <meta name="description" content={$t('about.heading')}>
 </head>
 

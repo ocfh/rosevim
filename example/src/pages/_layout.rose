@@ -11,13 +11,13 @@
 </script>
 
 <head>
-  <title>Rosevim</title>
-  <meta name="generator" content="Rosevim">
+  <title>Rosefn</title>
+  <meta name="generator" content="Rosefn">
 </head>
 
 <div>
   <header class="rh">
-    <strong class="rb">🌹 Rosevim</strong>
+    <strong class="rb">🌹 Rosefn</strong>
     <nav class="rn">
       {#each links() as link}
         <a href={link.href}>{link.label}</a>
@@ -28,6 +28,6 @@
     <slot />
   </main>
   <footer class="rf">
-    Rosevim — zero-hydration, compile-time reactivity
+    Rosefn — zero-hydration, compile-time reactivity
   </footer>
 </div>

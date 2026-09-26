@@ -1,15 +1,15 @@
-// rosevim single-binary server.
+// rosefn single-binary server.
 //
 // Embeds the built site (dist/) into one static Go binary - no Node, no
 // runtime dependencies, nothing to install on the target machine:
 //
 //	npm run build
-//	go build -o rosevim-server .
-//	PORT=8080 ./rosevim-server
+//	go build -o rosefn-server .
+//	PORT=8080 ./rosefn-server
 //
 // Static routes are served from the embedded prerendered HTML (one request
 // per page load, client bundle inlined). Text files are answered in the
-// brotli bytes `rosevim build` precompressed (dist/<file>.br) - zero
+// brotli bytes `rosefn build` precompressed (dist/<file>.br) - zero
 // per-request compression CPU - with weak ETags so repeat visits cost a
 // bodiless 304. Unknown paths fall back to index.html: the boot script
 // detects the route mismatch and client-renders the requested route, so
@@ -48,7 +48,7 @@ var dist embed.FS
 // once: raw bytes and gzip bytes are both cached forever. Without this the
 // server re-reads and re-gzips an ~11 KB document on every request - pure
 // CPU burn and allocation churn for output that can never change.
-// Brotli needs no cache at all: `rosevim build` writes dist/<file>.br next
+// Brotli needs no cache at all: `rosefn build` writes dist/<file>.br next
 // to every text file (innovation #28) and those exact bytes are served -
 // zero per-request compression CPU, and the same wire size the Node server
 // produces by compressing the file in memory.
@@ -183,7 +183,7 @@ func mimeOf(name string) string {
 }
 
 // Per-route response headers (innovation #26). dist/headers.json is written
-// by `rosevim build`: `default` carries the strict CSP (the CLI hashed the
+// by `rosefn build`: `default` carries the strict CSP (the CLI hashed the
 // exact inlined bundle + bootstrap bytes - this binary has no esbuild to
 // recompute them), and `routes` carries each route's exported headers.
 type headerRule struct {
@@ -334,29 +334,28 @@ func observe(next http.HandlerFunc) http.HandlerFunc {
 func metricsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 	var b strings.Builder
-	b.WriteString("# HELP rosevim_http_requests_total Total HTTP requests by status code.\n")
-	b.WriteString("# TYPE rosevim_http_requests_total counter\n")
+	b.WriteString("# HELP rosefn_http_requests_total Total HTTP requests by status code.\n")
+	b.WriteString("# TYPE rosefn_http_requests_total counter\n")
 	codes := make([]int, 0, 8)
 	reqTotal.Range(func(k, _ any) bool { codes = append(codes, k.(int)); return true })
 	sort.Ints(codes) // sync.Map iterates in random order; a scrape must be stable
 	for _, c := range codes {
 		v, _ := reqTotal.Load(c)
-		fmt.Fprintf(&b, "rosevim_http_requests_total{code=\"%d\"} %d\n", c, v.(*atomic.Uint64).Load())
+		fmt.Fprintf(&b, "rosefn_http_requests_total{code=\"%d\"} %d\n", c, v.(*atomic.Uint64).Load())
 	}
-	b.WriteString("# HELP rosevim_http_request_duration_seconds Request duration sum and count.\n")
-	b.WriteString("# TYPE rosevim_http_request_duration_seconds summary\n")
-	fmt.Fprintf(&b, "rosevim_http_request_duration_seconds_sum %.6f\n", float64(durSumNS.Load())/1e9)
-	fmt.Fprintf(&b, "rosevim_http_request_duration_seconds_count %d\n", reqCount.Load())
-	b.WriteString("# HELP rosevim_http_requests_in_flight Requests currently being served.\n")
-	b.WriteString("# TYPE rosevim_http_requests_in_flight gauge\n")
-	fmt.Fprintf(&b, "rosevim_http_requests_in_flight %d\n", inFlight.Load())
-	b.WriteString("# HELP rosevim_uptime_seconds Process uptime.\n")
-	b.WriteString("# TYPE rosevim_uptime_seconds gauge\n")
-	fmt.Fprintf(&b, "rosevim_uptime_seconds %.3f\n", time.Since(bootTime).Seconds())
+	b.WriteString("# HELP rosefn_http_request_duration_seconds Request duration sum and count.\n")
+	b.WriteString("# TYPE rosefn_http_request_duration_seconds summary\n")
+	fmt.Fprintf(&b, "rosefn_http_request_duration_seconds_sum %.6f\n", float64(durSumNS.Load())/1e9)
+	fmt.Fprintf(&b, "rosefn_http_request_duration_seconds_count %d\n", reqCount.Load())
+	b.WriteString("# HELP rosefn_http_requests_in_flight Requests currently being served.\n")
+	b.WriteString("# TYPE rosefn_http_requests_in_flight gauge\n")
+	fmt.Fprintf(&b, "rosefn_http_requests_in_flight %d\n", inFlight.Load())
+	b.WriteString("# HELP rosefn_uptime_seconds Process uptime.\n")
+	b.WriteString("# TYPE rosefn_uptime_seconds gauge\n")
+	fmt.Fprintf(&b, "rosefn_uptime_seconds %.3f\n", time.Since(bootTime).Seconds())
 	_, _ = w.Write([]byte(b.String()))
 }
 
-// ---- the hybrid deploy (innovation #34, consultant P0 §3, 方案B) ----------
 //
 // The binary is immutable by design: it serves exactly what the build baked.
 // A real app also has live routes - POST server actions, /api handlers that
@@ -365,7 +364,7 @@ func metricsHandler(w http.ResponseWriter, r *http.Request) {
 // and re-implement a language): point the binary at the Node server and let
 // each half do what it is good at.
 //
-//	UPSTREAM=http://dynamic:3000 ./rosevim-server
+//	UPSTREAM=http://dynamic:3000 ./rosefn-server
 //
 // With UPSTREAM set, everything the static half cannot answer itself is
 // reverse-proxied there: any non-GET/HEAD method (server actions, form
@@ -382,16 +381,16 @@ func setupUpstream() {
 	}
 	target, err := url.Parse(u)
 	if err != nil {
-		log.Fatalf("Rosevim: UPSTREAM %q is not a URL: %v", u, err)
+		log.Fatalf("Rosefn: UPSTREAM %q is not a URL: %v", u, err)
 	}
 	upstreamProxy = httputil.NewSingleHostReverseProxy(target)
 	upstreamProxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 		// The error trail: a dead backend must be visible in the logs, not
 		// silently turned into a 502 nobody can explain.
-		log.Printf("Rosevim error: upstream %s failed for %s %s: %v", u, r.Method, r.URL.Path, err)
+		log.Printf("Rosefn error: upstream %s failed for %s %s: %v", u, r.Method, r.URL.Path, err)
 		http.Error(w, "upstream unavailable", http.StatusBadGateway)
 	}
-	log.Printf("Rosevim: hybrid mode - non-GET requests and unbaked /api routes proxy to %s", u)
+	log.Printf("Rosefn: hybrid mode - non-GET requests and unbaked /api routes proxy to %s", u)
 }
 
 func proxyUpstream(w http.ResponseWriter, r *http.Request) {
@@ -461,6 +460,6 @@ func main() {
 		port = "8080"
 	}
 	http.HandleFunc("/", observe(handler))
-	log.Printf("Rosevim single-binary server listening on :%s", port)
+	log.Printf("Rosefn single-binary server listening on :%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
